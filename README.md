@@ -55,7 +55,13 @@ Run the Bash script to execute the full comparative workflow:
 
 ## 📊 Performance Results (E2E Router)
 
-Thanks to the **Logit Evaluation** technique, the Router system bypasses auto-regressive decoding, yielding an incredibly impressive response time while maintaining an Unsafe Recall comparable to massive parameter models.
+Thanks to the **Logit Evaluation** technique, the Router system achieves a latency of just `~0.18s`, making it faster than even the standalone 0.6B baseline model. 
+
+### Why is it so fast?
+- **Baseline 0.6B (Auto-regressive Generation):** Standard evaluation uses `model.generate()`, forcing the model to generate tokens one-by-one until it outputs a complete label (e.g., `"Safety: Safe"`) or reasoning tags (`<think>`). This requires multiple forward passes, drastically increasing latency.
+- **Router E2E (Single Forward Pass):** The E2E system feeds the prompt into the 0.6B model and performs exactly **one forward pass** (`outputs = model(**inputs)`). It then directly extracts the raw probabilities (logits) for the specific tokens corresponding to "Safe", "Unsafe", and "Controversial". The XGBoost router analyzes these 3 numbers in `~0.001s` and makes an instant decision, bypassing the slow auto-regressive generation entirely.
+
+This allows the Router to maintain an Unsafe Recall comparable to massive parameter models while responding in milliseconds.
 
 | System          | Accuracy   | Macro F1   | Unsafe Recall   | Avg Cost   | Latency(s) |
 |-----------------|------------|------------|-----------------|------------|------------|
