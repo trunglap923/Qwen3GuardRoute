@@ -1,0 +1,48 @@
+# configs/qwen3guard_4b_lora_v1.yaml
+# Cấu hình huấn luyện cho Qwen3Guard-Gen-4B SFT
+
+# --- MODEL SETTINGS ---
+model_name_or_path: "Qwen/Qwen3Guard-Gen-4B"
+
+# --- DATASET SETTINGS ---
+train_file: "data/training/qwen3guard/train_sft_qwen3guard_v3.jsonl"
+eval_file: "data/training/qwen3guard/val_sft_qwen3guard_v3.jsonl"
+test_file: "data/splits/test_final_clean_v3.jsonl"
+max_seq_length: 2048
+
+# --- LORA SETTINGS ---
+lora_target_modules: all-linear
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+
+# --- QLoRA SETTINGS ---
+load_in_4bit: true
+bnb_4bit_quant_type: nf4
+bnb_4bit_use_double_quant: true
+bf16: true
+fp16: false
+max_grad_norm: 1.0
+
+# --- TRAINING ARGUMENTS ---
+output_dir: "outputs/qwen3guard_4b_lora_v3"
+learning_rate: 2.0e-5
+num_train_epochs: 3.0
+per_device_train_batch_size: 8
+per_device_eval_batch_size: 8
+gradient_accumulation_steps: 2
+gradient_checkpointing: true
+lr_scheduler_type: "cosine"
+warmup_ratio: 0.1
+
+# --- EVALUATION & LOGGING ---
+eval_strategy: "steps"
+eval_steps: 100
+save_steps: 100
+logging_steps: 20
+save_total_limit: 3
+load_best_model_at_end: true
+metric_for_best_model: eval_loss
+
+# --- SEED ---
+seed: 42

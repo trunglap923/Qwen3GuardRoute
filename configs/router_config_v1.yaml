@@ -1,0 +1,14 @@
+seed: 42
+
+# --- ROUTER SETTINGS ---
+router_settings:
+  small_model:
+    base: "Qwen/Qwen3Guard-Gen-0.6B"
+    adapter: "outputs/qwen3guard_06b_lora_v3"
+  large_model:
+    base: "Qwen/Qwen3Guard-Gen-4B"
+    adapter: "outputs/qwen3guard_4b_lora_v3"
+  hidden_type: "last_token" # options: last_token, mean_pool, last4_mean
+  feature_sets:
+    A:
+      - hidden
