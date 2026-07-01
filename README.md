@@ -8,6 +8,12 @@ Qwen3Guard is a high-performance content moderation (Guardrails) system for Larg
 - **Ultra-fast End-to-End Router:** The Router leverages Logit Evaluation (extracting probabilities from a single forward-pass of the 0.6B model) to determine whether to escalate to the 4B model. The average latency is approximately **~0.18s**, which is even faster than running the 0.6B model standalone in generation mode.
 - **Complete Data Pipeline:** Includes an automated generation, cross-evaluation (LLM-as-a-Judge), and professional data consolidation pipeline to create high-quality SFT training datasets that are completely immune to data leakage (Zero Data Leakage).
 
+## 🤗 Hugging Face Releases
+
+All fine-tuned models, datasets, and router components are publicly available on Hugging Face:
+- **Models & Router System**: [truglpk3/Qwen3Guard-Router-System](https://huggingface.co/truglpk3/Qwen3Guard-Router-System)
+- **Training Datasets**: [truglpk3/Qwen3Guard-Dataset](https://huggingface.co/datasets/truglpk3/Qwen3Guard-Dataset)
+
 ## 📂 Repository Structure
 
 ```text
