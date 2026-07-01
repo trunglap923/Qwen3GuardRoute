@@ -61,7 +61,7 @@ def get_stats(data_list):
     return stats
 
 def main():
-    print(f"🔄 Đang tải dữ liệu từ: {MASTER_FILE.name}")
+    print(f" Loading data from: {MASTER_FILE.name}")
     data = []
     strata = []
     
@@ -76,19 +76,19 @@ def main():
             strata.append(f"{lbl}_{src}")
 
     total_samples = len(data)
-    print(f"📊 Tổng số mẫu: {total_samples}")
+    print(f" Tng s samples: {total_samples}")
     
-    # Bước 1: Tách 20% Router Pool, 80% Temp Train
+    # Step 1: Split 20% Router Pool, 80% Temp Train
     temp_data, router_pool_data, temp_strata, _ = train_test_split(
         data, strata, test_size=0.20, random_state=42, stratify=strata
     )
     
-    # Bước 2: Tách 12.5% của Temp Train làm Validation (0.125 * 0.8 = 0.10 của tổng)
+    # Step 2: Split 12.5% of Temp Train as Validation (0.125 * 0.8 = 0.10 of total)
     ft_train_data, ft_val_data = train_test_split(
         temp_data, test_size=0.125, random_state=42, stratify=temp_strata
     )
     
-    # Kiểm tra ID overlap
+    # Check ID overlap
     train_ids = set(s["sample_id"] for s in ft_train_data)
     val_ids = set(s["sample_id"] for s in ft_val_data)
     router_ids = set(s["sample_id"] for s in router_pool_data)
@@ -107,7 +107,7 @@ def main():
     write_jsonl(FT_VAL_FILE, ft_val_data)
     write_jsonl(ROUTER_POOL_FILE, router_pool_data)
     
-    # Tạo report
+    # Create report
     report = {
         "random_seed": 42,
         "input_checksum": calculate_checksum(MASTER_FILE),
@@ -134,11 +134,11 @@ def main():
     with open(REPORT_FILE, 'w', encoding='utf-8') as f:
         json.dump(report, f, indent=4, ensure_ascii=False)
         
-    print("✅ Đã chia tách dữ liệu hoàn tất!")
+    print(" Data splitting completed!")
     print(f"  - ft_train: {len(ft_train_data)} mẫu")
     print(f"  - ft_val: {len(ft_val_data)} mẫu")
     print(f"  - router_pool: {len(router_pool_data)} mẫu")
-    print(f"Báo cáo chi tiết lưu tại: {REPORT_FILE.name}")
+    print(f"Detailed report saved at: {REPORT_FILE.name}")
 
 if __name__ == "__main__":
     main()

@@ -48,8 +48,8 @@ def evaluate_router(y_true, y_pred, df_test):
     f1 = f1_score(y_true, y_pred, zero_division=0)
     
     cm = confusion_matrix(y_true, y_pred)
-    # y_true=1 (Nên chuyển 4B), y_pred=0 (Giữ 0.6B) -> False Negative
-    # Đây là lỗi nguy hiểm: Bỏ lọt mẫu đáng lẽ phải đẩy lên 4B
+    # y_true=1 (Should route to 4B), y_pred=0 (Keep 0.6B) -> False Negative
+    # This is a dangerous error: Missed samples that should have been routed to 4B
     try:
         fn = cm[1][0]
         actual_positives = cm[1].sum()
@@ -61,16 +61,16 @@ def evaluate_router(y_true, y_pred, df_test):
     cost06 = df_test['cost06'].values
     cost4 = df_test['cost4'].values
     
-    # Cost của các hệ thống cơ sở
+    # Cost of base systems
     avg_cost_always_06 = cost06.mean()
     avg_cost_always_4b = cost4.mean()
     
-    # Oracle Cost: Luôn chọn model có cost nhỏ hơn
+    # Oracle Cost: Always choose model with lower cost
     oracle_cost = np.minimum(cost06, cost4).mean()
     
     # Router Cost
-    # Nếu y_pred == 1 (Route) -> tốn cost4
-    # Nếu y_pred == 0 (Keep) -> tốn cost06
+    # If y_pred == 1 (Route) -> cost4 applies
+    # If y_pred == 0 (Keep) -> cost06 applies
     router_cost = np.where(y_pred == 1, cost4, cost06).mean()
     
     cost_reduction = avg_cost_always_06 - router_cost
@@ -93,9 +93,9 @@ def evaluate_router(y_true, y_pred, df_test):
     }
 
 def main():
-    print("🚀 Bắt đầu quá trình Huấn luyện SafeRoute")
+    print(" Starting SafeRoute Training process")
     
-    # Đọc config
+    # Read config
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
         
@@ -111,19 +111,19 @@ def main():
         df_train = load_data("train")
         df_test = load_data("test")
     except FileNotFoundError as e:
-        print(f"❌ Lỗi: {e}")
+        print(f" Error: {e}")
         return
         
-    print(f"✅ Đã load dữ liệu: Train ({len(df_train)} mẫu), Test ({len(df_test)} mẫu)")
+    print(f" Loaded data: Train ({len(df_train)} mẫu), Test ({len(df_test)} mẫu)")
     
-    # Định nghĩa các thuật toán Benchmark (có StandardScaler cho LR và MLP)
+    # Define Benchmark algorithms (with StandardScaler for LR and MLP)
     models = {
         "LR": Pipeline([("scaler", StandardScaler()), ("lr", LogisticRegression(random_state=seed, max_iter=1000, class_weight='balanced'))]),
         "XGB": XGBClassifier(random_state=seed, eval_metric='logloss'),
         "MLP": Pipeline([("scaler", StandardScaler()), ("mlp", MLPClassifier(random_state=seed, max_iter=500, hidden_layer_sizes=(128, 64)))])
     }
     
-    # Số chiều PCA không được vượt quá số feature đầu vào
+    # PCA dimensions cannot exceed the number of input features
     try:
         df_dummy = load_data("train")
         hidden_dim = len(df_dummy['hidden'].iloc[0])
@@ -136,7 +136,7 @@ def main():
     n_pca_256 = min(256, max_pca)
     n_pca_128 = min(128, max_pca)
     
-    # Thêm PCA Benchmarks trên Feature Set A (Dùng LR làm classifier baseline)
+    # Add PCA Benchmarks on Feature Set A (Using LR as classifier baseline)
     pca_models = {
         "PCA_256_LR": Pipeline([("scaler", StandardScaler()), ("pca", PCA(n_components=n_pca_256, random_state=seed)), ("lr", LogisticRegression(random_state=seed, max_iter=1000, class_weight='balanced'))]),
         "PCA_128_LR": Pipeline([("scaler", StandardScaler()), ("pca", PCA(n_components=n_pca_128, random_state=seed)), ("lr", LogisticRegression(random_state=seed, max_iter=1000, class_weight='balanced'))])
@@ -151,13 +151,13 @@ def main():
     # 1. Benchmark Standard Feature Sets
     for set_name, features in feature_sets.items():
         print(f"\\n{'='*50}")
-        print(f"🧪 THỬ NGHIỆM FEATURE SET {set_name}: {features}")
+        print(f" TESTING FEATURE SET {set_name}: {features}")
         
         X_train, y_train = extract_X_y(df_train, features)
         X_test, y_test = extract_X_y(df_test, features)
         
         for model_name, model in models.items():
-            print(f"  ▶ Đang train {model_name}...")
+            print(f"   Training {model_name}...")
             model.fit(X_train, y_train)
             y_pred = model.predict(X_test)
             
@@ -167,22 +167,22 @@ def main():
             
             print(f"    - Avg Cost: {metrics['Average Cost']:.3f} | Oracle Gap: {metrics['Oracle Gap']:.3f} | 4B Usage: {metrics['4B Usage Rate']:.1%}")
             
-            # Cập nhật Best Model (Tối ưu Average Cost)
+            # Update Best Model (Optimize Average Cost)
             if metrics['Average Cost'] < best_cost:
                 best_cost = metrics['Average Cost']
                 best_model = model
                 best_model_name = run_name
                 best_features = features
                 
-    # 2. Benchmark PCA Experiments (Chỉ dùng Feature Set A: Hidden)
+    # 2. Benchmark PCA Experiments (Only use Feature Set A: Hidden)
     print(f"\\n{'='*50}")
-    print(f"🧪 THỬ NGHIỆM DIMENSIONALITY REDUCTION (PCA)")
+    print(f" TESTING DIMENSIONALITY REDUCTION (PCA)")
     if "A" in feature_sets:
         X_train_pca, y_train_pca = extract_X_y(df_train, feature_sets["A"])
         X_test_pca, y_test_pca = extract_X_y(df_test, feature_sets["A"])
         
         for model_name, model in pca_models.items():
-            print(f"  ▶ Đang train {model_name}...")
+            print(f"   Training {model_name}...")
             model.fit(X_train_pca, y_train_pca)
             y_pred = model.predict(X_test_pca)
             
@@ -197,22 +197,22 @@ def main():
                 best_model_name = model_name
                 best_features = feature_sets["A"]
     else:
-        print("⚠️ Bỏ qua PCA vì không tìm thấy Feature Set 'A' trong config.")
+        print("️ Skip PCA v khng found Feature Set 'A' in config.")
         
-    # 3. Lưu kết quả
+    # 3. Save results
     if best_model is None:
         raise RuntimeError("No router model was trained successfully.")
         
     print(f"\\n{'='*50}")
-    print(f"🏆 BEST ROUTER MODEL: {best_model_name} (Cost: {best_cost:.3f})")
+    print(f" BEST ROUTER MODEL: {best_model_name} (Cost: {best_cost:.3f})")
     
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     
-    # Lưu file report JSON
+    # Save JSON report file
     with open(OUT_DIR / "metrics_report.json", "w", encoding="utf-8") as f:
         json.dump(results, f, indent=4, ensure_ascii=False)
         
-    # Lưu Joblib
+    # Save Joblib
     joblib_path = OUT_DIR / "best_router_model.joblib"
     metadata = {
         "model_name": best_model_name,
@@ -222,8 +222,8 @@ def main():
     }
     joblib.dump(metadata, joblib_path)
     
-    print(f"✅ Đã lưu report tại: {OUT_DIR}/metrics_report.json")
-    print(f"✅ Đã lưu model tại:  {joblib_path}")
+    print(f" Saved report at: {OUT_DIR}/metrics_report.json")
+    print(f" Saved model at:  {joblib_path}")
 
 if __name__ == "__main__":
     main()

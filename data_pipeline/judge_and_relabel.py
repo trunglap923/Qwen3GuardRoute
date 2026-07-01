@@ -30,7 +30,7 @@ INPUT    = BASE_DIR / "data" / "generated_aug_raw_v1.jsonl"
 OUTPUT   = BASE_DIR / "data" / "generated_aug_judged_v1.jsonl"
 ERRORS   = BASE_DIR / "data" / "generated_aug_judged_errors.jsonl"
 
-MODEL_JUDGE = "gpt-4.1-mini"  # Có thể đổi thành model xịn hơn như gpt-4o nếu cần
+MODEL_JUDGE = "gpt-4.1-mini"  # Can change to a better model like gpt-4o if needed
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 MAX_RETRIES = 3
@@ -225,7 +225,7 @@ def determine_final_status(sample: dict, judge_result: dict, rule_data: dict) ->
         "clean_status": "keep"
     }
     
-    # Logic xác định Final Label và Clean Status
+    # Logic to determine Final Label and Clean Status
     if metadata_label == judge_label:
         if not flags:
             status["clean_status"] = "keep"
@@ -250,7 +250,7 @@ def process_sample(sample: dict) -> dict:
         rule_data = evaluate_rules(sample)
         status = determine_final_status(sample, judge_result, rule_data)
         
-        # Merge status vào sample
+        # Merge status into sample
         sample["evaluation"] = status
         return {"success": True, "sample": sample}
     except Exception as e:
@@ -285,7 +285,7 @@ def main():
     errors_path = Path(args.output).parent / (Path(args.output).stem + "_errors.jsonl")
 
     if not input_path.exists():
-        print(f"❌ Không tìm thấy file {input_path}")
+        print(f" File not found {input_path}")
         return
 
     all_samples = []
@@ -294,16 +294,16 @@ def main():
             if line.strip():
                 all_samples.append(json.loads(line))
 
-    print(f"📂 Đã tải {len(all_samples)} mẫu từ {input_path.name}")
+    print(f" Loaded {len(all_samples)} mẫu từ {input_path.name}")
 
     completed_ids = load_completed_ids(output_path)
     pending_samples = [s for s in all_samples if s["job_id"] not in completed_ids]
 
     if not pending_samples:
-        print("🎉 Đã judge xong tất cả các mẫu.")
+        print(" Finished judging all samples.")
         return
 
-    print(f"▶️ Cần judge: {len(pending_samples)} mẫu")
+    print(f"️ Need to judge: {len(pending_samples)} mẫu")
 
     success_count = 0
     error_count = 0
@@ -335,7 +335,7 @@ def main():
                 
                 pbar.update(1)
 
-    print(f"\n✅ Hoàn tất. Thành công: {success_count}, Lỗi: {error_count}")
+    print(f"\n Completed. Success: {success_count}, Error: {error_count}")
 
 if __name__ == "__main__":
     main()

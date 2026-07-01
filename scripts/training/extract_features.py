@@ -54,27 +54,27 @@ def format_conversation(messages):
     return "\n".join(conv)
 
 def extract_features(model_name, base_path, adapter_path, data_path, output_path, hidden_type):
-    print(f"\\n🚀 Bắt đầu extract features cho model: {model_name}")
-    print(f"📥 Loading tokenizer từ: {base_path}")
+    print(f"\\n Starting to extract features for model: {model_name}")
+    print(f" Loading tokenizer from: {base_path}")
         
     try:
         tokenizer = AutoTokenizer.from_pretrained(base_path)
     except Exception as e:
-        print(f"Lỗi load tokenizer: {e}")
+        print(f"Error loading tokenizer: {e}")
         return
         
-    print(f"📥 Loading base model từ: {base_path}")
+    print(f" Loading base model from: {base_path}")
     
     try:
         model = AutoModelForCausalLM.from_pretrained(base_path, torch_dtype=torch.float16, device_map="auto")
         if adapter_path:
             try:
-                print(f"🔌 Loading LoRA adapter từ: {adapter_path}")
+                print(f" Loading LoRA adapter from: {adapter_path}")
                 model = PeftModel.from_pretrained(model, adapter_path)
             except Exception as e:
-                print(f"Không thể load adapter: {e}")
+                print(f"Cannot load adapter: {e}")
     except Exception as e:
-        print(f"Không thể load model. Lỗi: {e}")
+        print(f"Khng th load model. Error: {e}")
         return
         
     model.eval()
@@ -101,7 +101,7 @@ def extract_features(model_name, base_path, adapter_path, data_path, output_path
             if line.strip():
                 data.append(json.loads(line))
                 
-    print(f"Đọc được {len(data)} mẫu từ {data_path}")
+    print(f"Read {len(data)} mẫu từ {data_path}")
 
     records = []
     extract_time = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -114,14 +114,14 @@ def extract_features(model_name, base_path, adapter_path, data_path, output_path
             conv_text = format_conversation(item.get("messages", []))
             user_content = PROMPT_TEMPLATE.replace("{CONVERSATION}", conv_text)
             
-            # Đảm bảo prompt giống HỆT lúc SFT
+            # Ensure prompt is EXACTLY the same as during SFT
             prompt = (
                 "<|im_start|>user\n"
                 + user_content.strip()
                 + "<|im_end|>\n"
                 + "<|im_start|>assistant\n"
             )
-            # Thêm "Safety:" để dự đoán label token ngay lập tức
+            # Add "Safety:" to predict label token immediately
             prompt += "Safety:"
             prompts.append(prompt)
             
@@ -130,8 +130,8 @@ def extract_features(model_name, base_path, adapter_path, data_path, output_path
         with torch.no_grad():
             outputs = model(**inputs, output_hidden_states=True, return_dict=True)
             
-        # Lưu ý: Vì ta dùng padding_side='left', mask có dạng [0, 0, 1, 1], 
-        # dùng argsmax của cumsum sẽ cho đúng vị trí index của token cuối cùng
+        # Note: Because we use padding_side='left', mask format is [0, 0, 1, 1], 
+        # using argmax of cumsum will give correct index position of the last token
         last_idx = (inputs.attention_mask * torch.arange(inputs.attention_mask.shape[1], device=device)).argmax(dim=1)
         
         batch_indices = torch.arange(inputs.input_ids.size(0), device=device)
@@ -149,7 +149,7 @@ def extract_features(model_name, base_path, adapter_path, data_path, output_path
         else:
             batch_hidden = outputs.hidden_states[-1][batch_indices, last_idx, :].cpu().numpy().astype(np.float32)
             
-        # Trích xuất First-token logits để lấy Prediction & Confidence
+        # Extract First-token logits to get Prediction & Confidence
         next_token_logits = outputs.logits[batch_indices, last_idx, :]
         probs = torch.softmax(next_token_logits, dim=-1)
         
@@ -182,9 +182,9 @@ def extract_features(model_name, base_path, adapter_path, data_path, output_path
     df = pd.DataFrame(records)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     df.to_parquet(output_path, index=False)
-    print(f"✅ Đã lưu {len(df)} mẫu vào {output_path}")
+    print(f" Already lu {len(df)} mẫu vào {output_path}")
     
-    # Giải phóng VRAM
+    # Free VRAM
     del model
     del tokenizer
     torch.cuda.empty_cache()

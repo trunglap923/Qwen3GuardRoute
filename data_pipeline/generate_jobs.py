@@ -13,8 +13,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# ── Đường dẫn ────────────────────────────────────────────────────────
-BASE_DIR = Path(__file__).resolve().parent.parent   # thư mục gốc project
+# ── Paths ────────────────────────────────────────────────────────────
+BASE_DIR = Path(__file__).resolve().parent.parent   # Project root directory
 if len(sys.argv) > 2:
     INPUT_PATH = Path(sys.argv[1])
     OUTPUT_PATH = Path(sys.argv[2])
@@ -86,7 +86,7 @@ def expand_by_distribution(
         raw.append([value, base, exact - base])
         used += base
 
-    # Phân bổ phần dư cho các item có remainder lớn nhất
+    # Allocate remainder to items with the largest remainder
     remaining = total_count - used
     raw.sort(key=lambda x: x[2], reverse=True)
     for i in range(remaining):
@@ -124,7 +124,7 @@ REQUIRED_COMBO_FIELDS = [
 ]
 VALID_LABELS = {"safe", "controversial", "unsafe"}
 
-# FIX 4: Định nghĩa style
+# FIX 4: Define style
 STYLE_DESC_VI: dict[str, str] = {
     "natural_user":      "Người dùng thông thường, đặt câu hỏi tự nhiên, không chuyên kỹ thuật",
     "technical_user":   "Người dùng có kiến thức kỹ thuật, dùng thuật ngữ chuyên ngành",
@@ -140,7 +140,7 @@ STYLE_DESC_EN: dict[str, str] = {
     "research_context": "Academic or research setting driven by intellectual curiosity",
 }
 
-# FIX 3: Định nghĩa cả 3 nhãn để model có context ranh giới
+# FIX 3: Define all 3 labels to give the model boundary context
 DOMAIN_DESC_VI: dict[str, str] = {
     "academic_discussion": "Thảo luận học thuật, trao đổi kiến thức hàn lâm",
     "agent_workflow": "Luồng làm việc của AI agent (gọi tool, lập kế hoạch, thực thi)",
@@ -292,7 +292,7 @@ def validate_combo(combo: dict) -> None:
         )
 
 
-# FIX 2: Build schema động theo n_messages
+# FIX 2: Build dynamic schema based on n_messages
 def build_schema_example(n: int) -> str:
     """
     Tạo schema JSON minh hoạ với đúng n messages xen kẽ user/assistant.
@@ -431,10 +431,10 @@ def main() -> None:
     with INPUT_PATH.open("r", encoding="utf-8") as f:
         combos: list[dict] = json.load(f)
 
-    # Validate toàn bộ plan trước khi bắt đầu sinh
+    # Validate entire plan before starting generation
     for combo in combos:
         validate_combo(combo)
-    print(f"✅ Validated {len(combos)} combos — OK")
+    print(f" Validated {len(combos)} combos — OK")
 
     jobs: list[dict] = []
 
@@ -467,7 +467,7 @@ def main() -> None:
                 # ── IDs ──────────────────────────────────────────────
                 "job_id":          f"{combo_id}_{idx:06d}",
                 "sample_id":       f"{combo_id}_{language}_{idx:06d}",
-                "base_sample_id":  f"base_{combo_id}_{idx:06d}",   # FIX 5: thêm base_sample_id
+                "base_sample_id":  f"base_{combo_id}_{idx:06d}",   # FIX 5: add base_sample_id
                 "conversation_id": f"conv_{combo_id}_{idx:06d}",
                 "template_id":     combo_id,
                 "generation_prompt_id": "gen_v1",
@@ -499,19 +499,19 @@ def main() -> None:
             job["prompt"] = build_prompt(job)
             jobs.append(job)
 
-    # ── Ghi output ───────────────────────────────────────────────────
+    # ── Write output ───────────────────────────────────────────────────
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     with OUTPUT_PATH.open("w", encoding="utf-8") as f:
         for job in jobs:
             f.write(json.dumps(job, ensure_ascii=False) + "\n")
 
-    # ── In tóm tắt ───────────────────────────────────────────────────
+    # ── Print summary ───────────────────────────────────────────────────
     from collections import Counter
     lang_counter  = Counter(j["language"]   for j in jobs)
     nmsg_counter  = Counter(j["n_messages"] for j in jobs)
     group_counter = Counter(j["group"]      for j in jobs)
 
-    print(f"✅ Đã tạo {len(jobs):,} jobs → {OUTPUT_PATH}")
+    print(f" Created {len(jobs):,} jobs → {OUTPUT_PATH}")
     print()
     print("Language:")
     for lang, cnt in sorted(lang_counter.items()):
@@ -526,15 +526,15 @@ def main() -> None:
         print(f"  {g}: {cnt:,}")
 
     print()
-    # In 2 job mẫu để kiểm tra
+    # Print 2 sample jobs for testing
     print("─" * 60)
-    print("Mẫu job đầu tiên (không có prompt):")
+    print("Mu job u tin (khng have prompt):")
     sample = {k: v for k, v in jobs[0].items() if k != "prompt"}
     print(json.dumps(sample, ensure_ascii=False, indent=2))
 
     print()
     print("─" * 60)
-    print("Prompt của job đầu tiên:")
+    print("Prompt of the first job:")
     print(jobs[0]["prompt"])
 
 

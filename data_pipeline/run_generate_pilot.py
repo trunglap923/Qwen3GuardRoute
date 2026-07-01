@@ -36,20 +36,20 @@ from tqdm import tqdm
 
 load_dotenv()
 
-# ── Đường dẫn ────────────────────────────────────────────────────────────────
+# ── Paths ────────────────────────────────────────────────────────────────────
 BASE_DIR   = Path(__file__).resolve().parent.parent
 INPUT      = BASE_DIR / "data" / "generation_jobs.jsonl"
-OUTPUT     = BASE_DIR / "data" / "generated_raw.jsonl"       # target của audit script
+OUTPUT     = BASE_DIR / "data" / "generated_raw.jsonl"       # Audit script target
 ERRORS     = BASE_DIR / "data" / "generated_raw_errors.jsonl"
 
 MODEL        = "gpt-4.1-mini"
-MAX_RETRIES  = 3        # số lần retry khi lỗi timeout/network
-RETRY_DELAY  = 2.0      # giây chờ giữa retry
+MAX_RETRIES  = 3        # Retry count on timeout/network error
+RETRY_DELAY  = 2.0      # Seconds to wait between retries
 
 # ── API Client ────────────────────────────────────────────────────────────────
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# ── Lock để ghi file an toàn từ nhiều thread ─────────────────────────────────
+# ── Lock for thread-safe file writing ────────────────────────────────────────
 _write_lock = threading.Lock()
 
 
@@ -74,17 +74,17 @@ def load_jobs_stratified(path: Path, n: int, seed: int = 42) -> list[dict]:
         rng.shuffle(all_jobs)
         return all_jobs
 
-    # Nhóm theo 'group'
+    # Group by 'group'
     from collections import defaultdict
     groups: dict[str, list[dict]] = defaultdict(list)
     for job in all_jobs:
         groups[job.get("group", "unknown")].append(job)
 
-    # Shuffle từng nhóm
+    # Shuffle each group
     for g in groups.values():
         rng.shuffle(g)
 
-    # Round-robin lấy từ từng nhóm cho đến khi đủ N
+    # Round-robin from each group until N is reached
     group_keys    = sorted(groups.keys())
     group_iters   = {k: iter(v) for k, v in groups.items()}
     selected: list[dict] = []
@@ -100,9 +100,9 @@ def load_jobs_stratified(path: Path, n: int, seed: int = 42) -> list[dict]:
             except StopIteration:
                 pass
         if not added:
-            break   # tất cả nhóm đã hết
+            break   # All groups are exhausted
 
-    rng.shuffle(selected)  # shuffle lại để thứ tự không bị clustered theo group
+    rng.shuffle(selected)  # Reshuffle so order is not clustered by group
     return selected
 
 
@@ -210,7 +210,7 @@ def build_sample(job: dict, messages: list) -> dict:
         "label":                job["label"],
         "group":                job.get("group"),
         
-        # ── Augmentation metadata (Mới thêm) ──
+        # ── Augmentation metadata (Newly added) ──
         "base_combo_id":          job.get("base_combo_id"),
         "augmentation_type":      job.get("augmentation_type"),
         "target_error":           job.get("target_error"),
@@ -255,31 +255,31 @@ def main():
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # ── 1. Load jobs ──────────────────────────────────────────────────────────
-    print(f"📂 Input : {input_path}")
-    print(f"📄 Output: {output_path}")
-    print(f"⚙️  Model : {MODEL}  |  Workers: {args.workers}")
+    print(f" Input : {input_path}")
+    print(f" Output: {output_path}")
+    print(f" Model : {MODEL}  |  Workers: {args.workers}")
 
     all_jobs = load_jobs_stratified(input_path, args.n)
     print(f"Loaded {len(all_jobs):,} jobs (target n={args.n})")
 
-    # ── 2. Resume: bỏ qua các job đã hoàn thành ──────────────────────────────
+    # ── 2. Resume: skip completed jobs ────────────────────────────────────────
     completed_ids = load_completed_ids(output_path)
     if completed_ids:
-        print(f"✅ Resume mode: {len(completed_ids):,} job đã hoàn thành, sẽ skip.")
+        print(f" Resume mode: {len(completed_ids):,} job đã hoàn thành, sẽ skip.")
 
     pending_jobs = [j for j in all_jobs if j["job_id"] not in completed_ids]
 
     if not pending_jobs:
-        print("🎉 Tất cả job đã hoàn thành! Không cần chạy thêm.")
+        print(" All jobs completed! No need to run further.")
         return
 
-    print(f"▶️  Cần sinh thêm: {len(pending_jobs):,} job\n")
+    print(f"️  Need to generate: {len(pending_jobs):,} job\n")
 
-    # ── 3. Chạy song song, ghi file ngay sau mỗi kết quả ─────────────────────
+    # ── 3. Run in parallel, write to file immediately after each result ────────
     success_count = 0
     error_count   = 0
 
-    # Mở file ở chế độ APPEND (a) để resume không ghi đè
+    # Open file in APPEND (a) mode so resume does not overwrite
     with (
         output_path.open("a", encoding="utf-8") as out_f,
         errors_path.open("a", encoding="utf-8") as err_f,
@@ -300,7 +300,7 @@ def main():
 
                 with _write_lock:
                     if result["success"]:
-                        # Ghi ngay, flush ngay — đảm bảo không mất dữ liệu
+                        # Write immediately, flush immediately — ensure no data loss
                         out_f.write(json.dumps(result["sample"], ensure_ascii=False) + "\n")
                         out_f.flush()
                         success_count += 1
@@ -322,14 +322,14 @@ def main():
     # ── 4. Summary ────────────────────────────────────────────────────────────
     total_done = len(completed_ids) + success_count
     print(f"\n{'='*55}")
-    print(f"✅ Thành công  : {success_count:,} (lần này) + {len(completed_ids):,} (trước) = {total_done:,} tổng")
-    print(f"❌ Lỗi         : {error_count:,} → {errors_path.name}")
-    print(f"📄 Output      : {output_path}")
+    print(f" Success  : {success_count:,} (this time) + {len(completed_ids):,} (trước) = {total_done:,} tổng")
+    print(f" Error         : {error_count:,} → {errors_path.name}")
+    print(f" Output      : {output_path}")
     print(f"{'='*55}")
 
     if error_count > 0:
-        print(f"\n💡 Tip: chạy lại lệnh để retry {error_count} lỗi bị skip.")
-        print(f"   Hoặc inspect: {errors_path}")
+        print(f"\n Tip: rerun command to retry {error_count} skipped errors.")
+        print(f"   Or inspect: {errors_path}")
 
 
 if __name__ == "__main__":

@@ -44,23 +44,23 @@ def main():
 
     dataset_path = BASE_DIR / args.dataset
     if not os.path.exists(dataset_path):
-        print(f"❌ Không tìm thấy dataset tại {dataset_path}")
+        print(f" Dataset not found at {dataset_path}")
         return
 
-    print("🚀 Bắt đầu Khởi tạo Hệ thống...")
+    print(" Starting System Initialization...")
     try:
         system = SafeRouteSystem(CONFIG_PATH, ROUTER_MODEL_PATH)
     except Exception as e:
-        print(f"❌ Không thể khởi tạo SafeRouteSystem: {e}")
+        print(f" Failed to initialize SafeRouteSystem: {e}")
         return
 
     # Load Cost Matrix
     try:
         with open(COST_MATRIX_PATH, "r", encoding="utf-8") as f:
             cost_matrix = yaml.safe_load(f)
-        print("✅ Đã load Cost Matrix v1")
+        print(" Loaded Cost Matrix v1")
     except Exception as e:
-        print(f"❌ Lỗi load Cost Matrix: {e}")
+        print(f" Error loading Cost Matrix: {e}")
         return
 
     # Prepare Output File
@@ -69,7 +69,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     results_file = output_dir / f"results_{dataset_name}.jsonl"
 
-    print(f"📚 Đang tải dataset: {dataset_name}...")
+    print(f" Loading dataset: {dataset_name}...")
     data = []
     with open(dataset_path, "r", encoding="utf-8") as f:
         for line in f:
@@ -77,7 +77,7 @@ def main():
     
     if args.limit:
         data = data[:args.limit]
-        print(f"⚠️ Chạy chế độ giới hạn: {args.limit} mẫu")
+        print(f"️ Running in limited mode: {args.limit} samples")
 
     y_true = []
     y_pred = []
@@ -85,7 +85,7 @@ def main():
     latencies = []
     routed_4b_count = 0
 
-    print(f"🔄 Bắt đầu chạy Inference trên {len(data)} mẫu (Kết quả lưu tại {results_file.name})...")
+    print(f" Starting Inference on {len(data)} mẫu (Kết quả lưu tại {results_file.name})...")
     
     with open(results_file, "w", encoding="utf-8") as out_f:
         for item in tqdm(data, desc="Evaluating"):
@@ -97,7 +97,7 @@ def main():
             try:
                 res = system.infer(messages)
             except Exception as e:
-                print(f"Lỗi inference mẫu {item.get('sample_id', 'unknown')}: {e}")
+                print(f"Li inference samples {item.get('sample_id', 'unknown')}: {e}")
                 continue
                 
             latency = time.time() - start_time
@@ -106,7 +106,7 @@ def main():
             routed_to = res["routed_to"]
             confidence = res["confidence"]
             
-            # Tính Cost
+            # Calculate Cost
             try:
                 cost = cost_matrix[gold_label][pred_label]
             except KeyError:
@@ -120,7 +120,7 @@ def main():
             if routed_to == "4B":
                 routed_4b_count += 1
                 
-            # Lưu chi tiết
+            # Save details
             out_item = {
                 "sample_id": item.get("sample_id", ""),
                 "source": item.get("source", ""),
@@ -133,19 +133,19 @@ def main():
             }
             out_f.write(json.dumps(out_item, ensure_ascii=False) + "\n")
             
-    print(f"✅ Đã lưu kết quả chi tiết từng câu hỏi tại: {results_file}")
+    print(f" Detailed results for each question saved to: {results_file}")
     
     if not y_true:
-        print("❌ Không có dữ liệu để đánh giá.")
+        print(" No data to evaluate.")
         return
         
-    # Tính toán Metric
+    # Calculate Metrics
     metrics = calculate_metrics(y_true, y_pred, costs, name="SafeRoute(Ours)")
     metrics["Latency (s)"] = sum(latencies) / len(latencies) if latencies else 0.0
     usage_4b = (routed_4b_count / len(y_true)) * 100
     
     print("\n" + "="*95)
-    print(f"🏆 KẾT QUẢ ĐÁNH GIÁ TRÊN BỘ: {dataset_name.upper()} 🏆")
+    print(f" EVALUATION RESULTS ON DATASET: {dataset_name.upper()} 🏆")
     print("="*95)
     header = f"| {'System':<18} | {'Accuracy':<8} | {'Macro F1':<8} | {'Unsafe Recall':<13} | {'Dec. Cost':<9} | {'Latency':<8} | {'Large Usage':<11} |"
     print(header)
@@ -160,7 +160,7 @@ def main():
     print(f"| {metrics['Name']:<18} | {acc:<8} | {f1:<8} | {rec:<13} | {cost:<9} | {lat:<8} | {use:<11} |")
     print("="*95)
     
-    print("\n📊 CHI TIẾT TỪNG NHÃN (CLASSIFICATION REPORT)")
+    print("\n DETAIL BY LABEL (CLASSIFICATION REPORT)")
     valid_labels = ["safe", "controversial", "unsafe"]
     print(classification_report(y_true, y_pred, labels=valid_labels, digits=4, zero_division=0))
     
@@ -176,7 +176,7 @@ def main():
         f.write(f"| {metrics['Name']:<18} | {acc:<8} | {f1:<8} | {rec:<13} | {cost:<9} | {lat:<8} | {use:<11} |\n\n")
         f.write(classification_report(y_true, y_pred, labels=valid_labels, digits=4, zero_division=0))
         
-    print(f"✅ Đã lưu tóm tắt báo cáo tại: {summary_file}")
+    print(f" Summary report saved to: {summary_file}")
 
 if __name__ == "__main__":
     main()

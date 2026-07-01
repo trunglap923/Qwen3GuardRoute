@@ -18,7 +18,7 @@ OUTPUT_FILE = BASE_DIR / "data" / "original_judged_v2_final.jsonl"
 
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 if not DEEPSEEK_API_KEY:
-    print("❌ Lỗi: Không tìm thấy DEEPSEEK_API_KEY trong file .env")
+    print(" Error: Not found DEEPSEEK_API_KEY in file .env")
     exit(1)
 
 deepseek_client = OpenAI(
@@ -99,7 +99,7 @@ def apply_final_logic(sample: dict, j2_result: dict = None, judge2_failed: bool 
         return sample
 
     if not j2_result:
-        # Nếu không chạy Judge 2 (keep an toàn)
+        # If Judge 2 is not run (keep safe)
         if "empty_messages" in flags:
             ev["clean_status_final"] = "drop"
             ev["final_label"] = "invalid"
@@ -113,7 +113,7 @@ def apply_final_logic(sample: dict, j2_result: dict = None, judge2_failed: bool 
             ev["clean_status_final"] = "manual_review"
             ev["final_label"] = None
     else:
-        # Nếu đã chạy Judge 2
+        # If Judge 2 has been run
         j2 = j2_result.get("judge_label")
         j2_conf = j2_result.get("confidence", 0.0)
         
@@ -168,11 +168,11 @@ def main():
                         pass
     
     if processed_ids:
-        print(f"🔄 Tìm thấy {len(processed_ids)} mẫu đã hoàn thành trước đó. Sẽ chạy tiếp phần còn lại...")
+        print(f" Found {len(processed_ids)} mẫu đã hoàn thành trước đó. Sẽ chạy tiếp phần còn lại...")
 
     samples = []
     if not INPUT_FILE.exists():
-        print(f"❌ Không tìm thấy {INPUT_FILE}")
+        print(f" Not found {INPUT_FILE}")
         return
 
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
@@ -180,7 +180,7 @@ def main():
             if line.strip():
                 samples.append(json.loads(line))
 
-    print(f"📂 Đã tải {len(samples)} mẫu từ Judge 1.")
+    print(f" Loaded {len(samples)} mẫu từ Judge 1.")
 
     audit_pool = []
     skip_pool = []
@@ -220,21 +220,21 @@ def main():
         else:
             skip_pool.append(s)
             
-    print(f"🎯 Phân loại các mẫu chưa xử lý:")
-    print(f"   - Số mẫu cần Judge 2 Audit: {len(audit_pool)}")
-    print(f"   - Số mẫu Keep An toàn (bỏ qua Judge 2): {len(skip_pool)}")
+    print(f" Phn loi cc samples cha x l:")
+    print(f"   - S samples cn Judge 2 Audit: {len(audit_pool)}")
+    print(f"   - S samples Keep An ton (b qua Judge 2): {len(skip_pool)}")
     
-    # Mở file dạng append để ghi trực tiếp (streaming)
+    # Open file in append mode for direct writing (streaming)
     out_f = open(OUTPUT_FILE, "a", encoding="utf-8")
     
     if skip_pool:
-        print(f"⏩ Đang ghi {len(skip_pool)} mẫu bỏ qua Audit ra file...")
+        print(f"Writing {len(skip_pool)} mẫu bỏ qua Audit ra file...")
         for s in skip_pool:
             out_f.write(json.dumps(apply_final_logic(s, None), ensure_ascii=False) + "\n")
         out_f.flush()
         
     if audit_pool:
-        print(f"🚀 Bắt đầu gọi DeepSeek API cho {len(audit_pool)} mẫu...")
+        print(f" Starting DeepSeek API calls for {len(audit_pool)} mẫu...")
         with ThreadPoolExecutor(max_workers=args.workers) as executor:
             futures = {executor.submit(call_deepseek_judge, s): s for s in audit_pool}
             for future in tqdm(as_completed(futures), total=len(futures), desc="Judging with DeepSeek"):
@@ -243,7 +243,7 @@ def main():
                 if res["success"]:
                     r = apply_final_logic(s, res["judge2"])
                 else:
-                    print(f"\\nLỗi API mẫu {s.get('job_id')}: {res['error']}")
+                    print(f"\\nLi API samples {s.get('job_id')}: {res['error']}")
                     r = apply_final_logic(s, None, judge2_failed=True)
                 
                 out_f.write(json.dumps(r, ensure_ascii=False) + "\n")
@@ -251,14 +251,14 @@ def main():
 
     out_f.close()
     
-    # Thống kê cuối cùng
+    # Final statistics
     all_final_results = []
     with open(OUTPUT_FILE, "r", encoding="utf-8") as f:
         for line in f:
             if line.strip():
                 all_final_results.append(json.loads(line))
                 
-    print(f"\\n✅ Hoàn tất! Tổng cộng đã ghi {len(all_final_results)} mẫu ra {OUTPUT_FILE}")
+    print(f"\\n Completed! Total written {len(all_final_results)} mẫu ra {OUTPUT_FILE}")
     
     cnt = Counter(r.get("evaluation", {}).get("clean_status_final") for r in all_final_results)
     print("\\n=== FINAL CLEAN STATUS ===")

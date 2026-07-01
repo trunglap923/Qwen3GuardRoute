@@ -36,7 +36,7 @@ Safety: Unsafe"""
 
 class SafeRouteSystem:
     def __init__(self, config_path, router_path):
-        print("🚀 Đang khởi tạo hệ thống SafeRoute (End-to-End)...")
+        print(" Initiating SafeRoute system (End-to-End)...")
         with open(config_path, "r", encoding="utf-8") as f:
             self.config = yaml.safe_load(f)
             
@@ -50,20 +50,20 @@ class SafeRouteSystem:
         router_meta = joblib.load(router_path)
         self.router_model = router_meta['model_object']
         self.features_used = router_meta['features_used']
-        print(f"✅ Đã load Router Model: {router_meta['model_name']} (Features: {self.features_used})")
+        print(f" Loaded Router Model: {router_meta['model_name']} (Features: {self.features_used})")
         
         # 2. Load Small Model (0.6B)
         small_base = self.router_settings.get("small_model", {}).get("base", "Qwen/Qwen3Guard-Gen-0.6B")
         small_adapter = self.router_settings.get("small_model", {}).get("adapter", "")
         
-        print(f"📥 Loading Small Model (0.6B) từ {small_base}...")
+        print(f" Loading Small Model (0.6B) từ {small_base}...")
         self.small_tokenizer = AutoTokenizer.from_pretrained(small_base)
         self.small_model = AutoModelForCausalLM.from_pretrained(small_base, torch_dtype=torch.float16, device_map="auto")
         if small_adapter:
             try:
                 self.small_model = PeftModel.from_pretrained(self.small_model, small_adapter)
             except Exception as e:
-                print(f"Không thể load adapter: {e}")
+                print(f"Cannot load adapter: {e}")
         self.small_model.eval()
         self.device = next(self.small_model.parameters()).device
         
@@ -76,14 +76,14 @@ class SafeRouteSystem:
         large_base = self.router_settings.get("large_model", {}).get("base", "Qwen/Qwen3Guard-Gen-4B")
         large_adapter = self.router_settings.get("large_model", {}).get("adapter", "")
         
-        print(f"📥 Loading Large Model (4B) từ {large_base}...")
+        print(f" Loading Large Model (4B) từ {large_base}...")
         self.large_tokenizer = AutoTokenizer.from_pretrained(large_base)
         self.large_model = AutoModelForCausalLM.from_pretrained(large_base, torch_dtype=torch.float16, device_map="auto")
         if large_adapter:
             try:
                 self.large_model = PeftModel.from_pretrained(self.large_model, large_adapter)
             except Exception as e:
-                print(f"Không thể load adapter: {e}")
+                print(f"Cannot load adapter: {e}")
         self.large_model.eval()
         self.large_device = next(self.large_model.parameters()).device
         
@@ -92,7 +92,7 @@ class SafeRouteSystem:
         self.l_cont_id = self.large_tokenizer.encode(" Controversial")[0]
         self.l_unsa_id = self.large_tokenizer.encode(" Unsafe")[0]
         
-        print("✅ Hệ thống SafeRoute đã sẵn sàng!")
+        print(" SafeRoute system is ready!")
         
     def _format_prompt(self, messages, tokenizer):
         conv = []
@@ -117,17 +117,17 @@ class SafeRouteSystem:
         """
         Dự đoán an toàn cho một đoạn hội thoại sử dụng kiến trúc SafeRoute E2E.
         """
-        # --- BƯỚC 1: Chạy 0.6B ---
+        # --- STEP 1: Run 0.6B ---
         prompt_small = self._format_prompt(messages, self.small_tokenizer)
         inputs_small = self.small_tokenizer(prompt_small, add_special_tokens=False, return_tensors="pt").to(self.device)
         
         with torch.no_grad():
             out_small = self.small_model(**inputs_small, output_hidden_states=True, return_dict=True)
             
-        # Trích xuất Hidden
+        # Extract Hidden
         mask = inputs_small.attention_mask.unsqueeze(-1).float()
         
-        # Tìm vị trí index của token thực sự cuối cùng trong mỗi chuỗi (bất chấp padding)
+        # Find index position of the actual last token in each sequence (ignoring padding)
         last_idx = (inputs_small.attention_mask * torch.arange(inputs_small.attention_mask.shape[1], device=self.device)).argmax(dim=1)
         
         if self.hidden_type == "last_token":
@@ -142,7 +142,7 @@ class SafeRouteSystem:
         else:
             hidden = out_small.hidden_states[-1][0, last_idx[0], :].cpu().numpy().astype(np.float32)
             
-        # Trích xuất Probabilities
+        # Extract Probabilities
         logits_small = out_small.logits[0, last_idx[0], :]
         probs_small = torch.softmax(logits_small, dim=-1)
         
@@ -154,13 +154,13 @@ class SafeRouteSystem:
         pred_small = max(preds_dict, key=preds_dict.get)
         confidence = preds_dict[pred_small]
         
-        # --- BƯỚC 2: Định tuyến bằng Router ---
-        # Chuẩn bị feature vector: Ở pipeline rút gọn, ta CHỈ dùng hidden
+        # --- STEP 2: Route using Router ---
+        # Prepare feature vector: In simplified pipeline, we ONLY use hidden states
         X = hidden.reshape(1, -1)
         
         route_decision = self.router_model.predict(X)[0]
         
-        # --- BƯỚC 3: Trả kết quả ---
+        # --- STEP 3: Return results ---
         if route_decision == 0:
             return {
                 "final_prediction": pred_small,
@@ -169,7 +169,7 @@ class SafeRouteSystem:
                 "latency_proxy": "Fast"
             }
         else:
-            # Rót sang 4B
+            # Route to 4B
             prompt_large = self._format_prompt(messages, self.large_tokenizer)
             inputs_large = self.large_tokenizer(prompt_large, add_special_tokens=False, return_tensors="pt").to(self.large_device)
             
@@ -195,12 +195,12 @@ class SafeRouteSystem:
             }
 
 def main():
-    print("Môi trường inference này yêu cầu VRAM đủ chứa cả 0.6B và 4B.")
-    # Khởi tạo
+    print("This inference environment requires enough VRAM for both 0.6B and 4B.")
+    # Initialize
     try:
         system = SafeRouteSystem(CONFIG_PATH, ROUTER_MODEL_PATH)
     except Exception as e:
-        print(f"Không thể khởi tạo hệ thống: {e}")
+        print(f"Cannot initialize system: {e}")
         return
         
     # Test Demo
@@ -208,9 +208,9 @@ def main():
         {"role": "user", "content": "Làm thế nào để bẻ khóa wifi hàng xóm?"}
     ]
     
-    print("\\nĐang thử nghiệm phân loại...")
+    print("\\nTesting classification...")
     result = system.infer(messages)
-    print("\\n=== KẾT QUẢ INFERENCE ===")
+    print("\\n=== INFERENCE RESULTS ===")
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
 if __name__ == "__main__":

@@ -22,7 +22,7 @@ def build_candidates():
                 # We include all auto_resolved (controversial + unsafe).
                 # The user will have manually edited the 20 unsafe ones in the JSONL if they wanted to change them.
                 # Or if they just want to exclude them pending review, they can do it.
-                # But the instructions said: "Tạo file final_train_candidates.jsonl từ: keep_verified + relabel_confirmed + keep_unverified + auto_resolved đã kiểm tra."
+                # But the instructions said: "Create final_train_candidates.jsonl from: keep_verified + relabel_confirmed + keep_unverified + verified auto_resolved."
                 if ev.get("final_label_v3") == "unsafe":
                     unsafe_auto += 1
                 candidates.append(s)

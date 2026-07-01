@@ -41,7 +41,7 @@ def load_jsonl(path: Path):
             try:
                 items.append(json.loads(line))
             except json.JSONDecodeError as e:
-                print(f"  ❌ JSON parse error at line {i}: {e}")
+                print(f"   JSON parse error at line {i}: {e}")
     return items
 
 PASS = "✅"
@@ -50,16 +50,16 @@ WARN = "⚠️"
 
 all_passed = True
 
-# ─── Check 1: sample_id duplicates trong mỗi split ───────────────────────────
+# ─── Check 1: sample_id duplicates in each split ─────────────────────────────
 print("\n" + "="*70)
-print("CHECK 1: sample_id trùng lặp trong từng split file")
+print("CHECK 1: duplicate sample_id in each split file")
 print("="*70)
 
-split_id_sets = {}  # tên split -> set sample_id
+split_id_sets = {}  # split name -> sample_id set
 
 for name, path in SPLITS.items():
     if not path.exists():
-        print(f"  {FAIL} File không tồn tại: {path}")
+        print(f"  {FAIL} File not found: {path}")
         all_passed = False
         split_id_sets[name] = set()
         continue
@@ -74,9 +74,9 @@ for name, path in SPLITS.items():
     else:
         print(f"  {PASS} [{name}] {len(ids)} samples — không có trùng lặp")
 
-# ─── Check 2: Overlap giữa các splits ────────────────────────────────────────
+# ─── Check 2: Overlap between splits ─────────────────────────────────────────
 print("\n" + "="*70)
-print("CHECK 2: Overlap sample_id giữa các splits")
+print("CHECK 2: Overlap sample_id between splits")
 print("="*70)
 
 split_names = list(split_id_sets.keys())
@@ -88,7 +88,7 @@ for i in range(len(split_names)):
             print(f"  {FAIL} [{a}] ∩ [{b}] = {len(overlap)} mẫu bị chồng! Examples: {list(overlap)[:3]}")
             all_passed = False
         else:
-            print(f"  {PASS} [{a}] ∩ [{b}] = 0 — không overlap")
+            print(f"  {PASS} [{a}] ∩ [{b}] = 0 — no overlap")
 
 # ─── Check 3 & 4: SFT format + label format ──────────────────────────────────
 print("\n" + "="*70)
@@ -97,7 +97,7 @@ print("="*70)
 
 for name, path in SFT_FILES.items():
     if not path.exists():
-        print(f"  {FAIL} File không tồn tại: {path}")
+        print(f"  {FAIL} File not found: {path}")
         all_passed = False
         continue
 
@@ -107,7 +107,7 @@ for name, path in SFT_FILES.items():
 
     for idx, item in enumerate(items):
         msgs = item.get("messages", [])
-        # Check format: phải có đúng 2 messages [user, assistant]
+        # Check format: must have exactly 2 messages [user, assistant]
         if len(msgs) != 2:
             fmt_errors.append((idx, f"có {len(msgs)} messages"))
             continue
@@ -133,15 +133,15 @@ for name, path in SFT_FILES.items():
         print(f"  {FAIL} [{name}] {len(label_errors)} label sai. Ví dụ: {label_errors[:3]}")
         all_passed = False
     else:
-        print(f"  {PASS} [{name}] tất cả assistant output đúng format 'Safety: X'")
+        print(f"  {PASS} [{name}] all assistant outputs have correct format 'Safety: X'")
 
-# ─── Check 5: YAML trỏ đúng file ─────────────────────────────────────────────
+# ─── Check 5: YAML points to correct file ────────────────────────────────────
 print("\n" + "="*70)
-print("CHECK 5: YAML train_file / eval_file trỏ đúng")
+print("CHECK 5: YAML train_file / eval_file points correctly")
 print("="*70)
 
 if not YAML_PATH.exists():
-    print(f"  {FAIL} YAML không tồn tại: {YAML_PATH}")
+    print(f"  {FAIL} YAML does not exist: {YAML_PATH}")
     all_passed = False
 else:
     import yaml
@@ -151,20 +151,20 @@ else:
     for field in ("train_file", "eval_file"):
         val = cfg.get(field)
         if val is None:
-            print(f"  {FAIL} YAML thiếu field: {field}")
+            print(f"  {FAIL} YAML missing field: {field}")
             all_passed = False
         elif not Path(val).exists():
-            print(f"  {FAIL} [{field}] = '{val}' — FILE KHÔNG TỒN TẠI")
+            print(f"  {FAIL} [{field}] = '{val}' — FILE DOES NOT EXIST")
             all_passed = False
         else:
-            print(f"  {PASS} [{field}] = '{val}' — tồn tại")
+            print(f"  {PASS} [{field}] = '{val}' — exists")
 
 # ─── Summary ──────────────────────────────────────────────────────────────────
 print("\n" + "="*70)
 if all_passed:
-    print("🎉 TẤT CẢ CHECKS PASS — sẵn sàng backup và chạy dry-run!")
+    print(" ALL CHECKS PASS — ready to backup and dry-run!")
 else:
-    print("🚨 CÓ LỖI — vui lòng sửa trước khi chạy train!")
+    print(" ERRORS FOUND — please fix before training!")
 print("="*70 + "\n")
 
 sys.exit(0 if all_passed else 1)

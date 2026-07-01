@@ -15,10 +15,10 @@ RANDOM_SEED = 42
 
 def main():
     if not AUG_FILE.exists():
-        print(f"❌ Không tìm thấy {AUG_FILE}")
+        print(f" Not found {AUG_FILE}")
         return
     if not ORIGINAL_TRAIN_FILE.exists():
-        print(f"❌ Không tìm thấy {ORIGINAL_TRAIN_FILE}")
+        print(f" Not found {ORIGINAL_TRAIN_FILE}")
         return
         
     REPORT_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -49,7 +49,7 @@ def main():
             stats["label_distribution_before_merge_original"][lbl] += 1
             stats["label_distribution_master"][lbl] += 1
             
-    print(f"📥 Đã tải {stats['original_train_count']} mẫu từ Original Train.")
+    print(f" Loaded {stats['original_train_count']} samples from Original Train.")
     
     # 2. Load Augmentation
     aug_samples = []
@@ -64,7 +64,7 @@ def main():
             stats["label_distribution_master"][lbl] += 1
             stats["combo_distribution_augmentation"][s.get("combo_id", "")] += 1
             
-    print(f"📥 Đã tải {stats['augmentation_count']} mẫu từ Augmentation.")
+    print(f" Loaded {stats['augmentation_count']} samples from Augmentation.")
     
     # 3. Merge and Shuffle
     master_samples.extend(aug_samples)
@@ -81,11 +81,11 @@ def main():
     with open(REPORT_FILE, 'w', encoding='utf-8') as f:
         json.dump(stats, f, indent=4, ensure_ascii=False)
         
-    print(f"\n✅ Quá trình Merge hoàn tất!")
-    print(f"Báo cáo: {REPORT_FILE.name}")
-    print(f"Output Master Train: {OUT_MASTER_FILE.name} ({stats['master_train_count']} mẫu)")
+    print(f"\n Merge process completed!")
+    print(f"Report: {REPORT_FILE.name}")
+    print(f"Output Master Train: {OUT_MASTER_FILE.name} ({stats['master_train_count']} samples)")
     
-    print("\n📊 Báo cáo Merge:")
+    print("\n Merge Report:")
     print(json.dumps(stats, indent=2, ensure_ascii=False))
 
 if __name__ == "__main__":

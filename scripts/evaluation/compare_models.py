@@ -54,23 +54,23 @@ def main():
     parser.add_argument("--output_txt", type=str, default="outputs/evaluation/comparison_report.txt", help="Path to save the text report")
     args = parser.parse_args()
 
-    print("📚 Đang tải dữ liệu...")
+    print(" Loading data...")
     data_06b = load_jsonl(args.file_06b)
     data_4b = load_jsonl(args.file_4b)
     data_router = load_jsonl(args.file_router)
     data_baseline = load_jsonl(args.file_baseline_06b) if args.file_baseline_06b else None
     data_baseline_4b = load_jsonl(args.file_baseline_4b) if args.file_baseline_4b else None
 
-    # Lấy tập sample_id chung
+    # Get common sample_id set
     common_ids = set(data_06b.keys()) & set(data_4b.keys()) & set(data_router.keys())
     if data_baseline:
         common_ids &= set(data_baseline.keys())
     if data_baseline_4b:
         common_ids &= set(data_baseline_4b.keys())
-    print(f"✅ Đã tìm thấy {len(common_ids)} mẫu chung trên các hệ thống.\n")
+    print(f" Found {len(common_ids)} mẫu chung trên các hệ thống.\n")
     
     if len(common_ids) == 0:
-        print("❌ Không có mẫu chung nào để so sánh. Vui lòng kiểm tra lại file đầu vào.")
+        print(" Not have samples chung no  so snh. Vui lng kim tra li file u vo.")
         return
 
     y_true = []
@@ -90,7 +90,7 @@ def main():
     failed_by_router_count = 0
 
     for sid in common_ids:
-        # Lấy nhãn gold từ file router (hoặc 06b)
+        # Get gold labels from router file (or 0.6b)
         gold = data_router[sid].get("gold_label") or data_06b[sid].get("gold_label")
         pred_06b = data_06b[sid].get("pred_label")
         pred_4b = data_4b[sid].get("pred_label")
@@ -114,11 +114,11 @@ def main():
             y_pred_baseline_4b.append(pred_baseline_4b)
             y_lat_baseline_4b.append(data_baseline_4b[sid].get("latency_sec") or 0.0)
         
-        # 1. Số lần 0.6B sai nhưng Router thông minh đẩy lên 4B và đúng
+        # 1. Number of times 0.6B is wrong but smart Router routes to 4B and is correct
         if pred_06b != gold and pred_router == gold and routed_to == "4B":
             rescued_by_router_count += 1
             
-        # 2. Số lần 4B giỏi nhưng Router lại ngốc nghếch tin 0.6B làm sai luôn
+        # 2. Number of times 4B is good but foolish Router trusts 0.6B and is wrong
         if pred_4b == gold and pred_06b != gold and routed_to == "0.6B":
             failed_by_router_count += 1
 
@@ -161,7 +161,7 @@ def main():
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(report_content + "\n")
-    print(f"\n✅ Đã lưu kết quả so sánh ra file: {args.output_txt}")
+    print(f"\n Comparison results saved to file: {args.output_txt}")
 
 if __name__ == "__main__":
     main()

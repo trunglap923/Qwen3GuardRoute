@@ -43,14 +43,14 @@ def apply_runtime_safety_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
     if config.get("bf16", False):
         bf16_ok = torch.cuda.is_available() and torch.cuda.is_bf16_supported()
         if not bf16_ok:
-            print("⚠️ bf16=True nhưng GPU/runtime không hỗ trợ tốt bf16. Chuyển sang fp16=True, bf16=False.")
+            print("️ bf16=True but GPU/runtime does not support bf16 well. Switching to fp16=True, bf16=False.")
             config["bf16"] = False
             config["fp16"] = True
     return config
 
 
 def apply_dry_run_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
-    print("⚠️ CHẾ ĐỘ DRY-RUN ĐƯỢC KÍCH HOẠT")
+    print("️ DRY-RUN MODE ACTIVATED")
     config["output_dir"] = "outputs/qwen3guard_06b_lora_dryrun"
     config["num_train_epochs"] = 1
     config["max_steps"] = 20
@@ -80,7 +80,7 @@ def save_resolved_config(config: Dict[str, Any]) -> None:
     resolved_config_path = os.path.join(config["output_dir"], "resolved_config.yaml")
     with open(resolved_config_path, "w", encoding="utf-8") as f:
         yaml.dump(config, f, allow_unicode=True, sort_keys=False)
-    print(f"✅ Saved resolved config: {resolved_config_path}")
+    print(f" Saved resolved config: {resolved_config_path}")
 
 
 # -----------------------------------------------------------------------------
@@ -183,7 +183,7 @@ def manual_preprocess_function(examples, tokenizer, max_seq_length):
 
 def debug_manual_mask_preview(sample_messages, tokenizer, max_seq_length: int = 2048, max_print_tokens: int = 260) -> bool:
     print("\n" + "=" * 80)
-    print("🛠️ DEBUG MANUAL LOSS MASK PREVIEW")
+    print("️ DEBUG MANUAL LOSS MASK PREVIEW")
     print("=" * 80)
 
     batch = {"messages": [sample_messages]}
@@ -201,16 +201,16 @@ def debug_manual_mask_preview(sample_messages, tokenizer, max_seq_length: int = 
     print(f"Loss text: {repr(loss_text)}")
 
     if loss_token_count == 0:
-        print("❌ LỖI: Không có token nào được tính loss.")
+        print(" ERROR: No tokens were calculated for loss.")
         return False
 
     if "Safety:" not in loss_text:
-        print("❌ LỖI: Phần được tính loss không chứa 'Safety:'.")
+        print(" ERROR: The calculated loss part does not contain 'Safety:'.")
         return False
 
     valid_targets = ["Safety: Safe", "Safety: Controversial", "Safety: Unsafe"]
     if not any(t in loss_text for t in valid_targets):
-        print("⚠️ CẢNH BÁO: Loss text có 'Safety:' nhưng không khớp hoàn toàn 1 trong 3 target chuẩn.")
+        print("️ WARNING: Loss text has 'Safety:' but does not perfectly match 1 of the 3 standard targets.")
         print(f"Expected one of: {valid_targets}")
 
     print("\nPreview tokens:")
@@ -331,14 +331,14 @@ def main():
     save_resolved_config(config)
 
     # 1. Tokenizer
-    print(f"⏳ Đang tải Tokenizer: {config['model_name_or_path']}")
+    print(f"Loading Tokenizer: {config['model_name_or_path']}")
     tokenizer = AutoTokenizer.from_pretrained(config["model_name_or_path"], trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
 
     # 2. Dataset
-    print(f"⏳ Đang tải Dataset: {config['train_file']}")
+    print(f"Loading Dataset: {config['train_file']}")
     train_dataset = load_dataset("json", data_files=config["train_file"], split="train")
     eval_dataset = load_dataset("json", data_files=config["eval_file"], split="train")
 
@@ -364,15 +364,15 @@ def main():
     )
 
     if not is_mask_valid:
-        print("❌ Debug Mask thất bại. Dừng script.")
+        print(" Debug Mask failed. Stopping script.")
         sys.exit(1)
 
     if args.skip_training:
-        print("🛑 --skip_training được bật. Dừng script sau khi debug mask PASS.")
+        print(" --skip_training is enabled. Stopping script after debug mask PASS.")
         return
 
     # 4. Model + QLoRA
-    print("⏳ Đang tải QLoRA Model (4-bit)...")
+    print("ang ti QLoRA Model (4-bit)...")
     compute_dtype = torch.bfloat16 if config.get("bf16", False) else torch.float16
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=config.get("load_in_4bit", True),
@@ -406,7 +406,7 @@ def main():
     model.print_trainable_parameters()
 
     # 5. Preprocess dataset.
-    print("🔧 Đang preprocess dataset bằng manual assistant-only loss masking...")
+    print(" Preprocessing dataset using manual assistant-only loss masking...")
     train_dataset = train_dataset.map(
         lambda x: manual_preprocess_function(x, tokenizer, max_seq),
         batched=True,
@@ -434,17 +434,17 @@ def main():
     )
 
     # 7. Train & Save.
-    print("🚀 BẮT ĐẦU HUẤN LUYỆN...")
+    print(" STARTING TRAINING...")
     trainer.train()
 
-    print("💾 Đang lưu Adapter và Tokenizer...")
+    print(" Saving Adapter and Tokenizer...")
     trainer.save_model(config["output_dir"])
     tokenizer.save_pretrained(config["output_dir"])
 
     # 8. Sanity inference after dry-run.
     if args.dry_run:
         print("\n" + "=" * 50)
-        print("🧠 SANITY CHECK INFERENCE SAU DRY-RUN")
+        print(" SANITY CHECK INFERENCE AFTER DRY-RUN")
         print("=" * 50)
 
         model.eval()
